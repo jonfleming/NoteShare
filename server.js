@@ -1,10 +1,16 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs/promises');
+const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middleware
+app.use(cors({
+  origin: 'http://localhost:3000', // Allow requests from Next.js dev server
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type']
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
@@ -88,7 +94,12 @@ app.get('/api/notes', async (req, res) => {
 });
 
 // Serve the main app for all other routes
-app.get('*', (req, res) => {
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Handle all other routes
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
