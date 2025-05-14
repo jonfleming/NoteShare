@@ -7,7 +7,7 @@ import 'select2/dist/css/select2.min.css';
 import type { Select2Plugin } from 'select2';
 import jQuery from 'jquery';
 
-const ReactQuill = dynamic(() => import('react-quill'), {
+const ReactQuill = dynamic(() => import('react-quill-new'), {
   ssr: false,
 });
 
@@ -178,7 +178,7 @@ export default function MarkdownEditor() {
       </div>
       {status.message && (
         <div 
-          className={`mt-4 p-3 rounded ${
+          className={`mt-4 p-3 rounded text-sm font-normal ${
             status.type === 'success' 
               ? 'bg-green-100 text-green-700 border border-green-200' 
               : 'bg-red-100 text-red-700 border border-red-200'
