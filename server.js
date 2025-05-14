@@ -62,7 +62,6 @@ nextApp.prepare().then(() => {
       res.status(500).json({ error: 'Server error' });
     }
   });
-
   // Save note
   app.post('/api/notes/:id', async (req, res) => {
     try {
@@ -75,6 +74,11 @@ nextApp.prepare().then(() => {
       }
       
       const notePath = path.join(dataDir, `${noteId}.json`);
+      
+      // Create data directory if it doesn't exist (for new installations)
+      await fs.mkdir(path.dirname(notePath), { recursive: true });
+      
+      // Write the file
       await fs.writeFile(notePath, JSON.stringify({ content, updated: new Date() }));
       
       res.json({ success: true });
@@ -91,8 +95,8 @@ nextApp.prepare().then(() => {
       const noteIds = files
         .filter(file => file.endsWith('.json'))
         .map(file => path.basename(file, '.json'));
-      
-      res.json({ ids: noteIds });
+
+      res.json(noteIds);
     } catch (err) {
       console.error('Error getting note IDs:', err);
       res.status(500).json({ error: 'Server error' });
