@@ -7,11 +7,28 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Launch Program",
+            "name": "Launch Express Server",
             "skipFiles": [
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/server.js"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Next.js",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "dev"],
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Launch Both",
+            "configurations": ["Launch Express Server", "Launch Next.js"]
         }
     ]
 }

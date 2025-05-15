@@ -141,6 +141,11 @@ nextApp.prepare().then(() => {
       res.status(500).json({ error: 'Server error' });
     }
   });
+
+  app.get('/favicon.ico', (req, res) => {
+    res.sendFile(path.join(__dirname, 'src', 'app', 'favicon.ico'));
+  });
+
   // Handle all other routes with Next.js
   app.all('/', (req, res) => {
     console.log(`Request URL: ${req.url}`);
