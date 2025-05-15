@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Markdown Editor",
-  description: "A simple markdown editor built with Next.js and React-Quill",
+  title: "Notes",
+  description: "A simple note editor built with Next.js and React-Quill",
 };
 
 export default function RootLayout({

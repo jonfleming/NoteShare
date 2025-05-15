@@ -15,7 +15,8 @@ nextApp.prepare().then(() => {
   app.use(cors({
     origin: 'http://localhost:3000',
     methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    allowedHeaders: ['Content-Type', 'If-Match', 'If-None-Match'],
+    exposedHeaders: ['ETag']
   }));
   app.use(express.json());
   app.use('/_next/static', express.static(path.join(__dirname, '.next/static')));
@@ -23,7 +24,7 @@ nextApp.prepare().then(() => {
   const dataDir = path.join(__dirname, 'data');
   fs.mkdir(dataDir, { recursive: true }).catch(err => {
     console.error('Could not create data directory:', err);
-  });``
+  });
 
   // API routes
   // Get note
@@ -40,15 +41,25 @@ nextApp.prepare().then(() => {
       
       try {
         const data = await fs.readFile(notePath, 'utf8');
-        const acceptHeader = req.get('Accept');
         const note = JSON.parse(data);
+        
+        // Generate ETag from the last update timestamp
+        const etag = `"${new Date(note.updated).getTime()}"`;
+        
+        // Check If-None-Match header
+        const ifNoneMatch = req.get('If-None-Match');
+        if (ifNoneMatch && ifNoneMatch === etag) {
+          return res.status(304).end();
+        }
+
+        res.set('ETag', etag);
+        const acceptHeader = req.get('Accept');
+        
         if (acceptHeader && acceptHeader.includes('application/json')) {
-            // Send JSON response as before
-            return res.json(note);
+          return res.json(note);
         } else {
-            // Send just the content as plain text
-            res.set('Content-Type', 'text/plain');
-            return res.send(note.content);
+          res.set('Content-Type', 'text/plain');
+          return res.send(note.content);
         }      
       } catch (err) {
         // If file doesn't exist, return empty content
@@ -78,9 +89,37 @@ nextApp.prepare().then(() => {
       // Create data directory if it doesn't exist (for new installations)
       await fs.mkdir(path.dirname(notePath), { recursive: true });
       
-      // Write the file
-      await fs.writeFile(notePath, JSON.stringify({ content, updated: new Date() }));
+      // Check If-Match header for concurrency control
+      const ifMatch = req.get('If-Match');
+      console.log(`match passed: ${ifMatch || 'false'}`);
+      if (ifMatch) {
+        try {
+          const existingData = await fs.readFile(notePath, 'utf8');
+          const existingNote = JSON.parse(existingData);
+          const currentEtag = `"${new Date(existingNote.updated).getTime()}"`;
+          
+          console.log('Server Save:', ifMatch, currentEtag);
+          if (ifMatch !== currentEtag) {
+            console.log(`ETag mismatch, note was modified. Returning existing ETag ${currentEtag}`);
+            res.set('ETag', currentEtag);
+            return res.status(205).json({ message: 'Note was modified' });
+          }
+        } catch (err) {
+          if (err.code !== 'ENOENT') {
+            throw err;
+          }
+          // File doesn't exist yet, that's okay for new notes
+        }
+      }
       
+      const now = new Date();
+      // Write the file
+      const updated = now;
+      await fs.writeFile(notePath, JSON.stringify({ content, updated }));
+      console.log(`File updated: ${updated.getTime()}`);
+      // Return new ETag
+      const newEtag = `"${now.getTime()}"`;
+      res.set('ETag', newEtag);
       res.json({ success: true });
     } catch (err) {
       console.error('Error saving note:', err);
