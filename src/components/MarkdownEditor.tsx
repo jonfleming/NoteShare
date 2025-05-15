@@ -363,6 +363,9 @@ export default function MarkdownEditor() {
       <div className="flex gap-4 mb-4 items-center">
         <select ref={selectRef} />
       </div>
+      <div className="ml-auto text-sm text-gray-500">
+        {activeUsers.length} user{activeUsers.length !== 1 ? 's' : ''} active
+      </div>      
       <div className="border rounded-lg overflow-hidden">
         <ReactQuillWrapper
           forwardedRef={editorRef}
