@@ -107,7 +107,7 @@ export default function MarkdownEditor() {
     if (!noteId) return;
     
     try {
-      setStatus({ message: `Loading... ${lastSaved}`, type: 'success' });
+      setStatus({ message: `Loading...`, type: 'success' });
       const response = await fetch(`http://localhost:4000/api/notes/${noteId}`, {
         headers: {
           'Accept': 'application/json',
@@ -122,7 +122,7 @@ export default function MarkdownEditor() {
       const eTag = getETagFromResponse(response);
       setLastSaved(eTag);
       console.log(`setLastSaved: ${eTag} on reload`);
-      setStatus({ message: `Reloaded ${lastSaved}`, type: 'success' });
+      setStatus({ message: `Reloaded`, type: 'success' });
     } catch (error: any) {
       const message = error?.message || 'An unknown error occurred';
       setStatus({ message: 'Error reloading note: ' + message, type: 'error' });
@@ -143,7 +143,7 @@ export default function MarkdownEditor() {
 
       console.log(`saveNote Triggered LastSaved: ${lastSaved}`);
       try {
-        setStatus({ message: `Saving...${lastSaved}`, type: 'success' });
+        setStatus({ message: `Saving...`, type: 'success' });
         const response = await fetch(`http://localhost:4000/api/notes/${noteId}`, {
           method: 'POST',
           headers: {
@@ -157,7 +157,7 @@ export default function MarkdownEditor() {
         setLastSaved(eTag);
         prevContent.current = content;
         console.log(`setLastSaved: ${eTag} on save`);
-        setStatus({ message: `Saved ${eTag}`, type: 'success' });
+        setStatus({ message: `Saved`, type: 'success' });
       } catch (error: any) {
         const message = error?.message || 'An unknown error occurred';
         setStatus({ message: 'Error saving note: ' + message, type: 'error' });
@@ -199,7 +199,6 @@ export default function MarkdownEditor() {
   useEffect(() => {
     if (status.message.includes('Saved') || status.message.includes('Loaded!')) {
       const timer = setTimeout(() => {
-        setStatus({ message: `Last Saved ${lastSaved}`, type: '' });
       }, 3000);
       return () => clearTimeout(timer);
     }
@@ -256,13 +255,13 @@ export default function MarkdownEditor() {
               const eTag = getETagFromResponse(response);
               setLastSaved(eTag);
               console.log(`setLastSaved: ${eTag} on reload`);
-              setStatus({ message: `Reloaded ${lastSaved}`, type: 'success' });
+              setStatus({ message: `Reloaded`, type: 'success' });
               
               return response.json();
             })
             .then(data => {
               setContent(data.content);
-              setStatus({ message: `Loaded ${lastSaved}`, type: 'success' });
+              setStatus({ message: `Loaded`, type: 'success' });
             })
             .catch(error => {
               const message = error?.message || 'An unknown error occurred';
@@ -363,20 +362,8 @@ export default function MarkdownEditor() {
     <div className="w-full max-w-4xl mx-auto p-4">
       <div className="flex gap-4 mb-4 items-center">
         <select ref={selectRef} />
-        {noteId && (
-          <>
-            <button
-              onClick={reloadContent}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-            >
-              Reload
-            </button>
-            <div className="ml-auto text-sm text-gray-500">
-              {activeUsers.length} user{activeUsers.length !== 1 ? 's' : ''} active
-            </div>
-          </>
-        )}
-      </div>      <div className="border rounded-lg overflow-hidden">
+      </div>
+      <div className="border rounded-lg overflow-hidden">
         <ReactQuillWrapper
           forwardedRef={editorRef}
           theme="snow"
