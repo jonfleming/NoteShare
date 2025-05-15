@@ -3,12 +3,90 @@ const next = require('next');
 const path = require('path');
 const fs = require('fs/promises');
 const cors = require('cors');
+const { Server } = require('socket.io');
+const http = require('http');
 
 const dev = process.env.NODE_ENV !== 'production';
 const nextApp = next({ dev });
 const handle = nextApp.getRequestHandler();
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: 'http://localhost:3000',
+    methods: ['GET', 'POST']
+  }
+});
+
 const PORT = process.env.PORT || 4000;
+
+// Keep track of connected clients by noteId
+const connectedClients = new Map();
+
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+  let currentNoteId = null;
+
+  socket.on('join-note', (noteId) => {
+    console.log(`Client ${socket.id} joined note: ${noteId}`);
+    
+    // Leave previous note room if any
+    if (currentNoteId) {
+      socket.leave(currentNoteId);
+      const clients = connectedClients.get(currentNoteId) || new Set();
+      clients.delete(socket.id);
+      if (clients.size === 0) {
+        connectedClients.delete(currentNoteId);
+      } else {
+        connectedClients.set(currentNoteId, clients);
+      }
+    }
+
+    // Join new note room
+    socket.join(noteId);
+    currentNoteId = noteId;
+    
+    // Add to connected clients
+    const clients = connectedClients.get(noteId) || new Set();
+    clients.add(socket.id);
+    connectedClients.set(noteId, clients);
+
+    // Notify other clients about the new connection
+    socket.to(noteId).emit('user-joined', {
+      userId: socket.id,
+      activeUsers: Array.from(clients)
+    });
+  });
+
+  socket.on('content-change', ({ noteId, content, cursorPosition }) => {
+    // Broadcast the change to all other clients viewing this note
+    console.log(`Content change in note ${noteId} by ${socket.id}`);
+    socket.to(noteId).emit('content-update', {
+      userId: socket.id,
+      content,
+      cursorPosition
+    });
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+    if (currentNoteId) {
+      const clients = connectedClients.get(currentNoteId);
+      if (clients) {
+        clients.delete(socket.id);
+        if (clients.size === 0) {
+          connectedClients.delete(currentNoteId);
+        } else {
+          // Notify remaining clients about the disconnection
+          socket.to(currentNoteId).emit('user-left', {
+            userId: socket.id,
+            activeUsers: Array.from(clients)
+          });
+        }
+      }
+    }
+  });
+});
 
 nextApp.prepare().then(() => {
   // Middleware
@@ -45,13 +123,6 @@ nextApp.prepare().then(() => {
         
         // Generate ETag from the last update timestamp
         const etag = `"${new Date(note.updated).getTime()}"`;
-        
-        // Check If-None-Match header
-        const ifNoneMatch = req.get('If-None-Match');
-        if (ifNoneMatch && ifNoneMatch === etag) {
-          return res.status(304).end();
-        }
-
         res.set('ETag', etag);
         const acceptHeader = req.get('Accept');
         
@@ -89,37 +160,22 @@ nextApp.prepare().then(() => {
       // Create data directory if it doesn't exist (for new installations)
       await fs.mkdir(path.dirname(notePath), { recursive: true });
       
-      // Check If-Match header for concurrency control
-      const ifMatch = req.get('If-Match');
-      console.log(`match passed: ${ifMatch || 'false'}`);
-      if (ifMatch) {
-        try {
-          const existingData = await fs.readFile(notePath, 'utf8');
-          const existingNote = JSON.parse(existingData);
-          const currentEtag = `"${new Date(existingNote.updated).getTime()}"`;
-          
-          console.log('Server Save:', ifMatch, currentEtag);
-          if (ifMatch !== currentEtag) {
-            console.log(`ETag mismatch, note was modified. Returning existing ETag ${currentEtag}`);
-            res.set('ETag', currentEtag);
-            return res.status(205).json({ message: 'Note was modified' });
-          }
-        } catch (err) {
-          if (err.code !== 'ENOENT') {
-            throw err;
-          }
-          // File doesn't exist yet, that's okay for new notes
-        }
-      }
-      
       const now = new Date();
-      // Write the file
       const updated = now;
       await fs.writeFile(notePath, JSON.stringify({ content, updated }));
       console.log(`File updated: ${updated.getTime()}`);
+      
       // Return new ETag
       const newEtag = `"${now.getTime()}"`;
       res.set('ETag', newEtag);
+
+      // Notify all clients except the sender about the successful save
+      io.to(noteId).emit('note-saved', {
+        noteId,
+        eTag: newEtag,
+        timestamp: now.getTime()
+      });
+
       res.json({ success: true });
     } catch (err) {
       console.error('Error saving note:', err);
@@ -153,7 +209,7 @@ nextApp.prepare().then(() => {
     return nextApp.render(req, res, '/');
   });
 
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`> Ready on http://localhost:${PORT}`);
   });
 }).catch(err => {

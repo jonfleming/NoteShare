@@ -1,15 +1,76 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef } from 'react';
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
 import 'select2/dist/css/select2.min.css';
 import type { Select2Plugin } from 'select2';
 import jQuery from 'jquery';
+import io from 'socket.io-client';
+import ReactQuill from 'react-quill-new';
 
-const ReactQuill = dynamic(() => import('react-quill-new'), {
-  ssr: false,
-});
+// Define the props type for the editor
+interface EditorProps {
+  theme: string;
+  value: string;
+  onChange: (content: string) => void;
+  modules: {
+    toolbar: (string | string[])[];
+  };
+  formats: string[];
+  className: string;
+}
+
+// Create the dynamic component with proper typing
+const ReactQuillWrapper = dynamic(
+  async () => {
+    const { default: RQ } = await import('react-quill-new');
+    return ({ forwardedRef, ...props }: EditorProps & { forwardedRef: any }) => (
+      <RQ ref={forwardedRef} {...props} />
+    );
+  },
+  { ssr: false }
+);
+
+// Helper function to handle ETag values
+const getETagFromResponse = (response: Response): string => {
+  const etag = response.headers.get('ETag');
+  // If the ETag is already quoted, return it as is
+  if (etag?.startsWith('"') && etag?.endsWith('"')) {
+    return etag;
+  }
+  // If we have an ETag but it's not quoted, quote it
+  if (etag) {
+    return `"${etag}"`;
+  }
+  // If no ETag, return empty string
+  return '';
+};
+
+interface SocketEvents {
+  'content-update': {
+    userId: string;
+    content: string;
+    cursorPosition?: { index: number; length: number; };
+  };
+  'user-joined': {
+    userId: string;
+    activeUsers: string[];
+  };
+  'user-left': {
+    userId: string;
+    activeUsers: string[];
+  };
+  'save-conflict': {
+    noteId: string;
+    currentEtag: string;
+  };
+  'note-saved': {
+    noteId: string;
+    eTag: string;
+    timestamp: number;
+  };
+}
 
 const modules = {
   toolbar: [
@@ -34,10 +95,13 @@ export default function MarkdownEditor() {
   const [content, setContent] = useState('');
   const [noteId, setNoteId] = useState('');
   const [lastSaved, setLastSaved] = useState<string>('');
-  const [status, setStatus] = useState<{ message: string; type: 'success' | 'error' | ''; }>({ message: '', type: '' });
+  const [status, setStatus] = useState<{ message: string; type: 'success' | 'error' | ''; }>({ message: '', type: '' });  const [activeUsers, setActiveUsers] = useState<string[]>([]);
   const selectRef = useRef<HTMLSelectElement>(null);
   const prevContent = useRef<string>(content);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const socketRef = useRef<ReturnType<typeof io> | null>(null);
+  const editorRef = useRef<ReactQuill | null>(null);
+  const ignoreNextChangeRef = useRef(false);
 
   const reloadContent = async () => {
     if (!noteId) return;
@@ -51,17 +115,12 @@ export default function MarkdownEditor() {
         }
       });
       
-      if (response.status === 304) {
-        setStatus({ message: `Content is already up to date [${lastSaved}]`, type: 'success' });
-        return;
-      }
-      
       if (!response.ok) throw new Error('Failed to load note');
       
       const data = await response.json();
       setContent(data.content);
-      const eTag = response.headers.get('ETag');
-      setLastSaved(eTag || '');
+      const eTag = getETagFromResponse(response);
+      setLastSaved(eTag);
       console.log(`setLastSaved: ${eTag} on reload`);
       setStatus({ message: `Reloaded ${lastSaved}`, type: 'success' });
     } catch (error: any) {
@@ -75,42 +134,30 @@ export default function MarkdownEditor() {
     if (!noteId) return;
       
     const saveNote = async () => {
-      // Capture current values in local variables
-      const currentContent = content;
-      const currentLastSaved = lastSaved;
-      
-      if (prevContent.current == content && currentLastSaved === '') {
+      if (prevContent.current == content && lastSaved === '') {
         console.log(('nothing to save'));
         return;
 
         // otherwise, get the latest ETag
       }
 
-      console.log(`saveNote Triggered LastSaved: ${currentLastSaved}`);
+      console.log(`saveNote Triggered LastSaved: ${lastSaved}`);
       try {
-        setStatus({ message: `Saving...${currentLastSaved}`, type: 'success' });
+        setStatus({ message: `Saving...${lastSaved}`, type: 'success' });
         const response = await fetch(`http://localhost:4000/api/notes/${noteId}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'If-Match': currentLastSaved
+            'If-Match': lastSaved
           },
-          body: JSON.stringify({ content: currentContent }),
-        });
-
-        if (!response.ok) throw new Error('Failed to save note');
+          body: JSON.stringify({ content }),
+        });        if (!response.ok) throw new Error('Failed to save note');
   
-        const eTag = response.headers.get('ETag');
-        setLastSaved(eTag || '');
+        const eTag = getETagFromResponse(response);
+        setLastSaved(eTag);
+        prevContent.current = content;
         console.log(`setLastSaved: ${eTag} on save`);
         setStatus({ message: `Saved ${eTag}`, type: 'success' });
-        prevContent.current = content;
-
-        if (response.status === 205) {
-          setStatus({ message: `Content was modified by another user.  Reload. [${eTag}]}`, type: 'success' });
-          console.log('Content was modified by another user. Updating eTag.');
-        }
-
       } catch (error: any) {
         const message = error?.message || 'An unknown error occurred';
         setStatus({ message: 'Error saving note: ' + message, type: 'error' });
@@ -118,6 +165,16 @@ export default function MarkdownEditor() {
     };
 
     if (prevContent.current !== content) {
+      // Emit content change to other users
+      if (socketRef.current && editorRef.current) {
+        const cursorPosition = editorRef.current.getEditor().getSelection();
+        socketRef.current.emit('content-change', {
+          noteId,
+          content,
+          cursorPosition
+        });
+      }
+
       console.log('change Detected');
       // Clear existing timeout if any
       if (saveTimeoutRef.current) {
@@ -194,11 +251,10 @@ export default function MarkdownEditor() {
                 'Accept': 'application/json'
               }
             })
-            .then(response => {
-              if (!response.ok) throw new Error('Failed to load note');
+            .then(response => {              if (!response.ok) throw new Error('Failed to load note');
 
-              const eTag = response.headers.get('ETag');
-              setLastSaved(eTag || '');
+              const eTag = getETagFromResponse(response);
+              setLastSaved(eTag);
               console.log(`setLastSaved: ${eTag} on reload`);
               setStatus({ message: `Reloaded ${lastSaved}`, type: 'success' });
               
@@ -235,26 +291,100 @@ export default function MarkdownEditor() {
     };
   }, []);
 
+  // WebSocket connection and event handling
+  useEffect(() => {
+    // Initialize socket connection
+    socketRef.current = io('http://localhost:4000');
+    
+    socketRef.current.on('content-update', ({ userId, content, cursorPosition }: SocketEvents['content-update']) => {
+      console.log(`Content update from ${userId}: ${content}`);
+      if (ignoreNextChangeRef.current) {
+        ignoreNextChangeRef.current = false;
+        return;
+      }
+      
+      // Update content from other users
+      setContent(content);
+      prevContent.current = content;
+      
+      // Update cursor position if available
+      if (editorRef.current && cursorPosition) {
+        const editor = editorRef.current.getEditor();
+        editor.setSelection(cursorPosition);
+      }
+    });
+
+    socketRef.current.on('user-joined', ({ userId, activeUsers }: SocketEvents['user-joined']) => {
+      setActiveUsers(activeUsers);
+      setStatus({ 
+        message: `User ${userId.substring(0, 6)} joined`, 
+        type: 'success' 
+      });
+    });
+
+    socketRef.current.on('user-left', ({ userId, activeUsers }: SocketEvents['user-left']) => {
+      setActiveUsers(activeUsers);
+      setStatus({ 
+        message: `User ${userId.substring(0, 6)} left`, 
+        type: 'success' 
+      });
+    });
+
+    socketRef.current.on('save-conflict', ({ noteId, currentEtag }: SocketEvents['save-conflict']) => {
+      setStatus({ 
+        message: 'Another user has saved changes. Reloading...', 
+        type: 'error' 
+      });
+      reloadContent();
+    });
+
+    socketRef.current.on('note-saved', ({ noteId, eTag, timestamp }: SocketEvents['note-saved']) => {
+      setLastSaved(eTag);
+      setStatus({ 
+        message: `Note saved by another user`, 
+        type: 'success' 
+      });
+    });
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (noteId && socketRef.current) {
+      socketRef.current.emit('join-note', noteId);
+    }
+  }, [noteId]);
+
   return (
-    <div className="w-full max-w-4xl mx-auto p-4">      <div className="flex gap-4 mb-4 items-center">
+    <div className="w-full max-w-4xl mx-auto p-4">
+      <div className="flex gap-4 mb-4 items-center">
         <select ref={selectRef} />
         {noteId && (
-          <button
-            onClick={reloadContent}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-          >
-            Reload
-          </button>
+          <>
+            <button
+              onClick={reloadContent}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            >
+              Reload
+            </button>
+            <div className="ml-auto text-sm text-gray-500">
+              {activeUsers.length} user{activeUsers.length !== 1 ? 's' : ''} active
+            </div>
+          </>
         )}
-      </div>
-      <div className="border rounded-lg overflow-hidden">
-        <ReactQuill
+      </div>      <div className="border rounded-lg overflow-hidden">
+        <ReactQuillWrapper
+          forwardedRef={editorRef}
           theme="snow"
           value={content}
           onChange={setContent}
           modules={modules}
           formats={formats}
-          className="h-[400px]"
+          className="h-[90vh]"
         />
       </div>
       {status.message && (
