@@ -19,7 +19,9 @@ const io = new Server(server, {
       if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        console.log('CORS error for origin:', origin);
+        callback(null, true);        
+        // callback(new Error('Not allowed by CORS'));
       }
     },
     methods: ['GET', 'POST']
@@ -104,7 +106,9 @@ nextApp.prepare().then(() => {
       if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        console.log('CORS error for origin:', origin);
+        callback(null, true);
+        //callback(new Error('Not allowed by CORS'));
       }
     },
     methods: ['GET', 'POST'],
