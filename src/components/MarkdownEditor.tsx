@@ -9,6 +9,8 @@ import jQuery from 'jquery';
 import io from 'socket.io-client';
 import ReactQuill from 'react-quill-new';
 
+const serverUrl = `${window.location.protocol}//${window.location.hostname}:${window.location.port}`;
+
 // Define the props type for the editor
 interface EditorProps {
   theme: string;
@@ -108,7 +110,7 @@ export default function MarkdownEditor() {
     
     try {
       setStatus({ message: `Loading...`, type: 'success' });
-      const response = await fetch(`http://localhost:4000/api/notes/${noteId}`, {
+      const response = await fetch(`${serverUrl}/api/notes/${noteId}`, {
         headers: {
           'Accept': 'application/json',
           'If-None-Match': lastSaved // Add ETag support for conflict detection
@@ -144,15 +146,16 @@ export default function MarkdownEditor() {
       console.log(`saveNote Triggered LastSaved: ${lastSaved}`);
       try {
         setStatus({ message: `Saving...`, type: 'success' });
-        const response = await fetch(`http://localhost:4000/api/notes/${noteId}`, {
+        const response = await fetch(`${serverUrl}/api/notes/${noteId}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'If-Match': lastSaved
           },
           body: JSON.stringify({ content }),
-        });        if (!response.ok) throw new Error('Failed to save note');
-  
+        });
+        if (!response.ok) throw new Error('Failed to save note');
+
         const eTag = getETagFromResponse(response);
         setLastSaved(eTag);
         prevContent.current = content;
@@ -227,7 +230,7 @@ export default function MarkdownEditor() {
             };
           },          
           ajax: {
-            url: 'http://localhost:4000/api/notes',
+            url: '${serverUrl}/api/notes',
             processResults: function (data: string[]) {
               return {
                 results: data.map(noteId => ({
@@ -245,7 +248,7 @@ export default function MarkdownEditor() {
             setContent(''); // Clear content for new notes
           } else {            // Load the note content
             setStatus({ message: 'Loading...', type: 'success' });
-            fetch(`http://localhost:4000/api/notes/${id}`, {
+            fetch(`${serverUrl}/api/notes/${id}`, {
               headers: {
                 'Accept': 'application/json'
               }
@@ -293,8 +296,9 @@ export default function MarkdownEditor() {
   // WebSocket connection and event handling
   useEffect(() => {
     // Initialize socket connection
-    socketRef.current = io('http://localhost:4000');
-    
+    socketRef.current = io(`${serverUrl}`);
+    console.log('Socket connected:', socketRef.current.id);
+
     socketRef.current.on('content-update', ({ userId, content, cursorPosition }: SocketEvents['content-update']) => {
       console.log(`Content update from ${userId}: ${content}`);
       if (ignoreNextChangeRef.current) {

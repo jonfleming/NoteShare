@@ -14,16 +14,7 @@ const server = http.createServer(app);
 const allowedOrigins = ['http://localhost:3000', 'https://notes.jonfleming.net', 'https://notes.techion.net'];
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      console.log('Socket CORS origin:', origin);
-      if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
-        callback(null, true);
-      } else {
-        console.log('CORS error for origin:', origin);
-        callback(null, true);        
-        // callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: allowedOrigins,
     methods: ['GET', 'POST']
   }
 });
@@ -101,16 +92,7 @@ io.on('connection', (socket) => {
 nextApp.prepare().then(() => {
   // Middleware
   app.use(cors({
-    origin: (origin, callback) => {
-      console.log('Server CORS origin:', origin);
-      if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
-        callback(null, true);
-      } else {
-        console.log('CORS error for origin:', origin);
-        callback(null, true);
-        //callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'If-Match', 'If-None-Match'],
     exposedHeaders: ['ETag']
