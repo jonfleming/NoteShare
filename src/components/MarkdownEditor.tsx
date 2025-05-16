@@ -311,10 +311,10 @@ export default function MarkdownEditor() {
       prevContent.current = content;
       
       // Update cursor position if available
-      if (editorRef.current && cursorPosition) {
-        const editor = editorRef.current.getEditor();
-        editor.setSelection(cursorPosition);
-      }
+      // if (editorRef.current && cursorPosition) {
+      //   const editor = editorRef.current.getEditor();
+      //   editor.setSelection(cursorPosition);
+      // }
     });
 
     socketRef.current.on('user-joined', ({ userId, activeUsers }: SocketEvents['user-joined']) => {
