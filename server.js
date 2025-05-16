@@ -11,9 +11,16 @@ const nextApp = next({ dev });
 const handle = nextApp.getRequestHandler();
 const app = express();
 const server = http.createServer(app);
+const allowedOrigins = ['http://localhost:3000', 'https://notes.jonfleming.com'];
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: (origin, callback) => {
+      if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST']
   }
 });
@@ -91,7 +98,13 @@ io.on('connection', (socket) => {
 nextApp.prepare().then(() => {
   // Middleware
   app.use(cors({
-    origin: 'http://localhost:3000',
+    origin: (origin, callback) => {
+      if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'If-Match', 'If-None-Match'],
     exposedHeaders: ['ETag']
