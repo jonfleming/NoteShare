@@ -26,5 +26,5 @@ jobs:
             git stash -m "Deployment stash"
             git pull origin main
             git stash apply
-            npm run build
-            tmux new-session -d -s notes 'node server.js'
+            /home/jon/.nvm/versions/node/v20.11.0/bin/npm run build
+            tmux new-session -d -s notes '/home/jon/.nvm/versions/node/v20.11.0/bin/node server.js'
