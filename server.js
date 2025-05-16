@@ -15,6 +15,7 @@ const allowedOrigins = ['http://localhost:3000', 'https://notes.jonfleming.net',
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
+      console.log('Socket CORS origin:', origin);
       if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
         callback(null, true);
       } else {
@@ -99,7 +100,7 @@ nextApp.prepare().then(() => {
   // Middleware
   app.use(cors({
     origin: (origin, callback) => {
-      console.log('CORS origin:', origin);
+      console.log('Server CORS origin:', origin);
       if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
         callback(null, true);
       } else {
