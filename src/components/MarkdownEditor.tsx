@@ -171,6 +171,7 @@ export default function MarkdownEditor() {
       // Emit content change to other users
       if (socketRef.current && editorRef.current) {
         const cursorPosition = editorRef.current.getEditor().getSelection();
+        ignoreNextChangeRef.current = true;
         socketRef.current.emit('content-change', {
           noteId,
           content,
