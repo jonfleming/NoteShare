@@ -1,4 +1,4 @@
-name: Deploy NoteShare
+name: Deploy Web App
 
 on:
   push:
@@ -23,8 +23,8 @@ jobs:
           script: |
             tmux kill-session -t notes || true
             cd ~/projects/NoteShare
-			      git stash
+            git stash
             git pull origin main
-			      git stash apply
+            git stash apply
             npm run build
             tmux new-session -d -s notes 'node server.js'
