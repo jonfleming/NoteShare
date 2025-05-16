@@ -230,7 +230,7 @@ export default function MarkdownEditor() {
             };
           },          
           ajax: {
-            url: '${serverUrl}/api/notes',
+            url: `${serverUrl}/api/notes`,
             processResults: function (data: string[]) {
               return {
                 results: data.map(noteId => ({
