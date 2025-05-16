@@ -1,4 +1,4 @@
-# Share Notes
+# NoteShare - Shared Notes
 This is a [Next.js](https://nextjs.org) project that creates shared notes.
 
 ## Getting Started
