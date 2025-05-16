@@ -11,7 +11,7 @@ const nextApp = next({ dev });
 const handle = nextApp.getRequestHandler();
 const app = express();
 const server = http.createServer(app);
-const allowedOrigins = ['http://localhost:3000', 'https://notes.jonfleming.com'];
+const allowedOrigins = ['http://localhost:3000', 'https://notes.jonfleming.net', 'https://notes.techion.net'];
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
