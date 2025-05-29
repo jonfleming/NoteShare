@@ -6,6 +6,7 @@ This is a [Next.js](https://nextjs.org) project that creates shared notes.
 First, build the Next.js front end:
 
 ```bash
+npm i -g next
 npm install
 npm run build
 ```

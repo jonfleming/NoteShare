@@ -21,6 +21,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            echo "Starting deployment process" > /home/jon/deployment.log
             tmux kill-session -t notes || true
             cd ~/projects/NoteShare
             git stash -m "Deployment stash"
