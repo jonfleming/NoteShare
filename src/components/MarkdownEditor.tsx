@@ -97,7 +97,8 @@ export default function MarkdownEditor() {
   const [content, setContent] = useState('');
   const [noteId, setNoteId] = useState('');
   const [lastSaved, setLastSaved] = useState<string>('');
-  const [status, setStatus] = useState<{ message: string; type: 'success' | 'error' | ''; }>({ message: '', type: '' });  const [activeUsers, setActiveUsers] = useState<string[]>([]);
+  const [status, setStatus] = useState<{ message: string; type: 'success' | 'error' | ''; }>({ message: '', type: '' });  
+  const [activeUsers, setActiveUsers] = useState<string[]>([]);
   const selectRef = useRef<HTMLSelectElement>(null);
   const prevContent = useRef<string>(content);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -365,12 +366,13 @@ export default function MarkdownEditor() {
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4">
-      <div className="flex gap-4 mb-4 items-center">
+      <div className="flex gap-4 mb-4">
         <select ref={selectRef} />
-      </div>
-      <div className="ml-auto text-sm text-gray-500">
-        {activeUsers.length} user{activeUsers.length !== 1 ? 's' : ''} active
+        <div className="float-right">
+        `{activeUsers.length} user{activeUsers.length !== 1 ? 's' : ''} active
       </div>      
+
+      </div>
       <div className="border rounded-lg overflow-hidden">
         <ReactQuillWrapper
           forwardedRef={editorRef}
