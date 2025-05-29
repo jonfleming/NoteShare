@@ -24,7 +24,11 @@ jobs:
             tmux kill-session -t notes || true
             cd ~/projects/NoteShare
             git stash -m "Deployment stash"
+            echo "Pulling latest changes from main branch"
             git pull origin main
+            echo "Applying stashed changes"
             git stash apply
+            echo "Installing dependencies"
             /home/jon/.nvm/versions/node/v20.11.0/bin/npm run build
+            echo "Starting the application in a new tmux session"
             tmux new-session -d -s notes '/home/jon/.nvm/versions/node/v20.11.0/bin/node server.js'
