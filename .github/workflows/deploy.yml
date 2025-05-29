@@ -25,7 +25,7 @@ jobs:
             export NVM_DIR="$HOME/.nvm"
             echo "Load nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-            echo "Starting deployment process.  Home: $(HOME)" > /home/jon/deployment.log
+            echo "Starting deployment process.  Home: $HOME  " > /home/jon/deployment.log
             tmux kill-session -t notes || true
             cd ~/projects/NoteShare
             git stash -m "Deployment stash"
