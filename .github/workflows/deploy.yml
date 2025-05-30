@@ -2,8 +2,8 @@ name: Deploy Web App
 
 on:
   push:
-    branches:
-      - main  # Adjust if needed
+#    branches:
+#      - main  # Adjust if needed
   workflow_dispatch: # Allows manual triggering of the workflow
 jobs:
   deploy:
