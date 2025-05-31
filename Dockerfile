@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Install dependencies only when needed
 COPY package.json package-lock.json* ./
-RUN npm install --production
+RUN npm install
 
 # Copy the rest of the application code
 COPY . .
