@@ -30,4 +30,5 @@ docker run -d --name note_share -p 4000:4000 note_share:latest
 
 # To build for GHCR
 docker build -t ghcr.io/jonfleming/note_share:latest .
+docker push ghcr.io/jonfleming/note_share:latest
 docker run -d --name note_share -p 4000:4000 ghcr.io/jonfleming/note_share:latest

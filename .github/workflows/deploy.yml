@@ -1,14 +1,42 @@
-name: Deploy Web App
+name: Build, Publish, and Deploy
 
 on:
-#  push:
-#    branches:
-#      - main  # Adjust if needed
-  workflow_dispatch: # Allows manual triggering of the workflow
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
 jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
+
   deploy:
     runs-on: ubuntu-latest
-    
+    needs: build-and-push
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -16,7 +44,7 @@ jobs:
       - name: Deploy to Server
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.SERVER_HOST }} # Ensure SERVER_HOST is defined in repository secrets
+          host: ${{ secrets.SERVER_HOST }}
           port: ${{ secrets.SERVER_PORT }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -24,18 +52,14 @@ jobs:
             export HOME=/home/jon
             export NVM_DIR="$HOME/.nvm"
             echo "Load nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             echo "Starting deployment process.  Home: $HOME  " > /home/jon/deployment.log
-            tmux kill-session -t notes || true
             cd ~/projects/NoteShare
-            git stash -m "Deployment stash"
-            echo "Pulling latest changes from main branch"
-            git pull origin main
-            echo "Applying stashed changes"
-            git stash apply            
-            echo "Installing dependencies"
-            /home/jon/.nvm/versions/node/v20.11.0/bin/npm install
-            echo "Building the application"
-            /home/jon/.nvm/versions/node/v20.11.0/bin/npm run build
-            echo "Starting the application in a new tmux session"
-            tmux new-session -d -s notes '/home/jon/.nvm/versions/node/v20.11.0/bin/node server.js'
+
+            echo "Pulling latest image from GHCR"
+            sudo docker stop note_share
+            sudo docker rm note_share || true
+            sudo docker pull ghcr.io/${{ github.repository }}:latest
+
+            echo "Running the latest Docker image"
+            sudo docker run -d --name note_share -p 4000:4000 ghcr.io/${{ github.repository }}:latest
